@@ -43,7 +43,7 @@ struct parser_xtra {
     bool implicit_unicode;
     bool load_code;
     bool load_blessed;
-    HV *bad_anchors
+    HV *bad_anchors;
 };
 
 SV* perl_syck_lookup_sym( SyckParser *p, SYMID v) {
