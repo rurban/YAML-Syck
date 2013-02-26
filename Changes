@@ -1,3 +1,7 @@
+[Changes for 1.23 - 2013-02-26]
+
+* Tests all green on CPAN Testers. releasing to public.
+
 [Changes for 1.23_01 - 2013-02-21]
 
 * Make sure that LoadBlessed=0 blocks all blessing.
