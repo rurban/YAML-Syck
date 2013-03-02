@@ -1,17 +1,17 @@
 use t::TestYAML tests => 134;
 
-ok( YAML::Syck->VERSION );
+ok( YAML::Syck->VERSION, "YAML::Syck has a version and is loaded" );
 
-is( Dump(42),         "--- 42\n" );
-is( Load("--- 42\n"), 42 );
+is( Dump(42),         "--- 42\n", 'Dump a simple number' );
+is( Load("--- 42\n"), 42, "Load a simple number");
 
-is( Dump( \42 ),                           "--- !!perl/ref \n=: 42\n" );
-is( ${ Load("--- !!perl/ref \n=: 42\n") }, 42 );
+is( Dump( \42 ),                           "--- !!perl/ref \n=: 42\n", "A pointer to 42 dumps" );
+is( ${ Load("--- !!perl/ref \n=: 42\n") }, 42, "A pointer to 42 loads" );
 
 my $x;
 $x = \$x;
-is( Dump($x),                        "--- &1 !!perl/ref \n=: *1\n" );
-is( Dump( scalar Load( Dump($x) ) ), "--- &1 !!perl/ref \n=: *1\n" );
+is( Dump($x),                        "--- &1 !!perl/ref \n=: *1\n", "A Circular Reference Loads." );
+is( Dump( scalar Load( Dump($x) ) ), "--- &1 !!perl/ref \n=: *1\n", "A Circular Reference Round Trips." );
 
 $YAML::Syck::DumpCode = 0;
 is( Dump( sub { 42 } ), "--- !!perl/code: '{ \"DUMMY\" }'\n" );
