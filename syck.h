@@ -404,7 +404,7 @@ void syck_emitter_handler( SyckEmitter *, SyckEmitterHandler );
 void syck_free_emitter( SyckEmitter * );
 void syck_emitter_clear( SyckEmitter * );
 void syck_emitter_write( SyckEmitter *, const char *, long );
-void syck_emitter_escape( SyckEmitter *, char *, long );
+void syck_emitter_escape( SyckEmitter *, unsigned char *, long );
 void syck_emitter_flush( SyckEmitter *, long );
 void syck_emit( SyckEmitter *, st_data_t );
 void syck_emit_scalar( SyckEmitter *, char *, enum scalar_style, int, int, char, char *, long );

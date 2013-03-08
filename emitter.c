@@ -16,9 +16,9 @@
 
 #define DEFAULT_ANCHOR_FORMAT "id%03d"
 
-const char hex_table[] = 
+const unsigned char hex_table[] = 
 "0123456789ABCDEF";
-static char b64_table[] =
+static unsigned char b64_table[] =
 "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 /*
@@ -596,12 +596,12 @@ syck_scan_scalar( int req_width, char *cursor, long len )
     /* scan string */
     for ( i = 0; i < len; i++ ) {
 
-        if ( ! ( (unsigned)cursor[i] == 0x9 ||
-                 (unsigned)cursor[i] == 0xA ||
-                 (unsigned)cursor[i] == 0xD ||
-               ( (unsigned)cursor[i] >= 0x20 && (unsigned)cursor[i] <= 0x7E ) ||
-                 (unsigned)cursor[i] == 0x85 ||
-                 (unsigned)cursor[i] >= 0xa0 )
+        if ( ! ( (unsigned char)cursor[i] == 0x9 ||
+                 (unsigned char)cursor[i] == 0xA ||
+                 (unsigned char)cursor[i] == 0xD ||
+               ( (unsigned char)cursor[i] >= 0x20 &&
+                 (unsigned char)cursor[i] <= 0x7E ) ||
+                 (unsigned char)cursor[i] >= 0x80 )
         ) {
             flags |= SCAN_NONPRINT;
         }
@@ -810,7 +810,7 @@ void syck_emit_scalar( SyckEmitter *e, char *tag, enum scalar_style force_style,
 }
 
 void
-syck_emitter_escape( SyckEmitter *e, char *src, long len )
+syck_emitter_escape( SyckEmitter *e, unsigned char *src, long len )
 {
     int i;
     for( i = 0; i < len; i++ )
@@ -925,7 +925,7 @@ void syck_emit_2quoted_1( SyckEmitter *e, int width, char *str, long len )
             break;
 
             default:
-                syck_emitter_escape( e, mark, 1 );
+                syck_emitter_escape( e, (unsigned char *)mark, 1 );
             break;
         }
         mark++;
@@ -988,7 +988,7 @@ void syck_emit_2quoted( SyckEmitter *e, int width, char *str, long len )
             break;
 
             default:
-                syck_emitter_escape( e, mark, 1 );
+                syck_emitter_escape( e, (unsigned char*)mark, 1 );
             break;
         }
         mark++;
