@@ -39,6 +39,7 @@
 #endif
 
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <ctype.h>
 #ifdef HAVE_ST_H
@@ -99,18 +100,10 @@ extern "C" {
  * Node definitions
  */
 #ifndef ST_DATA_T_DEFINED
-#ifdef MINGW64
-typedef long long st_data_t;
-#else
-typedef long st_data_t;
-#endif
+typedef uintptr_t st_data_t;
 #endif
 
-#ifdef MINGW64
-#define SYMID unsigned long long
-#else
-#define SYMID unsigned long
-#endif
+#define SYMID uintptr_t
 
 typedef struct _syck_node SyckNode;
 

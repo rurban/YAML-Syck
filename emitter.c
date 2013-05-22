@@ -364,7 +364,6 @@ syck_emit( SyckEmitter *e, st_data_t n )
     SYMID oid;
     char *anchor_name = NULL;
     int indent = 0;
-    long x = 0;
     SyckLevel *parent;
     SyckLevel *lvl = syck_emitter_current_level( e );
     
@@ -406,7 +405,7 @@ syck_emit( SyckEmitter *e, st_data_t n )
             e->anchored = st_init_numtable();
         }
 
-        if ( ! st_lookup( e->anchored, (st_data_t)anchor_name, (st_data_t *)&x ) )
+        if ( ! st_lookup( e->anchored, (st_data_t)anchor_name, 0 ) )
         {
             char *an = S_ALLOC_N( char, strlen( anchor_name ) + 3 );
             sprintf( an, "&%s ", anchor_name );
@@ -420,8 +419,7 @@ syck_emit( SyckEmitter *e, st_data_t n )
             syck_emitter_write( e, an, strlen( anchor_name ) + 2 );
             free( an );
 
-            x = 1;
-            st_insert( e->anchored, (st_data_t)anchor_name, (st_data_t)x );
+            st_insert( e->anchored, (st_data_t)anchor_name, 0 );
             lvl->anctag = 1;
         }
         else
