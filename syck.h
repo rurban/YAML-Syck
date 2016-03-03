@@ -392,6 +392,7 @@ char *syck_match_implicit( char *, size_t );
  * API prototypes
  */
 char *syck_strndup( char *, long );
+int syck_str_is_unquotable_integer(char*, long);
 long syck_io_file_read( char *, SyckIoFile *, long, long );
 long syck_io_str_read( char *, SyckIoStr *, long, long );
 char *syck_base64enc( char *, long );

@@ -56,9 +56,6 @@
 #define YAML_INDENT 268
 #define YAML_IEND 269
 
-
-
-
 #if ! defined (YYSTYPE) && ! defined (YYSTYPE_IS_DECLARED)
 #line 35 "gram.y"
 typedef union YYSTYPE {
@@ -72,6 +69,8 @@ typedef union YYSTYPE {
 # define YYSTYPE_IS_DECLARED 1
 # define YYSTYPE_IS_TRIVIAL 1
 #endif
+
+int sycklex( YYSTYPE *sycklval, SyckParser *parser );
 
 
 

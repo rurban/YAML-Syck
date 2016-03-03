@@ -90,8 +90,6 @@
 #define YAML_IEND 269
 
 
-
-
 /* Copy the first part of user declarations.  */
 #line 14 "gram.y"
 
@@ -135,6 +133,7 @@ typedef union YYSTYPE {
     SyckNode *nodeData;
     char *name;
 } YYSTYPE;
+
 /* Line 191 of yacc.c.  */
 #line 140 "gram.c"
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */
@@ -142,6 +141,7 @@ typedef union YYSTYPE {
 # define YYSTYPE_IS_TRIVIAL 1
 #endif
 
+int sycklex( YYSTYPE *sycklval, SyckParser *parser );
 
 
 /* Copy the second part of user declarations.  */
