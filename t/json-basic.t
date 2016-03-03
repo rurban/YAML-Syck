@@ -42,14 +42,14 @@ my @tests = (
     '{"foo":""}',
     '["\"://\""]',
     '"~foo"',
-    { TEST => '"\/"', TODO => "backslashed char not working yet" },    # escaped solidus
+    { TEST => '"\/"',     TODO => "backslashed char not working yet" }, # escaped solidus
     '"\""',
     { TEST => '"\b"',     TODO => "backslashed char not working yet" },
     { TEST => '"\f"',     TODO => "backslashed char not working yet" },
     { TEST => '"\n"',     TODO => "backslashed char not working yet" },
     { TEST => '"\r"',     TODO => "backslashed char not working yet" },
-    { TEST => '"\t"',     TODO => "backslashed char not working yet" },
-    { TEST => '"\u0001"', TODO => "backslashed char not working yet" },
+    { TEST => '"\t"',     TODO => "backslashed \\t not working yet" },
+    { TEST => '"\u0001"', TODO => "backslashed \\u not working yet" },
 );
 
 plan tests => scalar @tests * ( 2 + $HAS_JSON ) * 2;
@@ -64,7 +64,9 @@ TODO: {
 
                 local $TODO;
                 if ( ref $test eq 'HASH' ) {
-                    $TODO = $test->{TODO};
+                    if ($single_quote or substr($test->{TEST},2,1) =~ m|[u/]|) {
+                        $TODO = $test->{TODO};
+                    }
                     $test = $test->{TEST};
                 }
 
@@ -84,7 +86,8 @@ TODO: {
                     s/([,:]) /$1/eg;
                 }
 
-                my $desc = "roundtrip $test -> " . Dumper($data) . " -> $json -> sq:$single_quote utf8:$unicode ";
+                my $desc = "roundtrip $test -> " . Dumper($data)
+                  . " -> $json -> sq:$single_quote utf8:$unicode ";
                 utf8::encode($desc);
                 is $json, $test, $desc;
 
