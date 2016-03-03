@@ -571,7 +571,7 @@ syck_scan_scalar( int req_width, char *cursor, long len )
     }
     if ( ( cursor[0] == '-' || cursor[0] == ':' ||
            cursor[0] == '?' || cursor[0] == ',' ) &&
-           ( cursor[1] == ' ' || cursor[1] == '\n' || len == 1 ) )
+           ( cursor[1] == ' ' || cursor[1] == '\n' || cursor[1] == '\r' || len == 1 ) )
     {
             flags |= SCAN_INDIC_S;
     }
