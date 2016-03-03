@@ -60,6 +60,7 @@ SV* perl_syck_lookup_sym( SyckParser *p, SYMID v) {
 #ifdef SvUTF8_on
 #define CHECK_UTF8 \
     if (((struct parser_xtra *)p->bonus)->implicit_unicode \
+      && n->data.str->len \
       && is_utf8_string((U8*)n->data.str->ptr, n->data.str->len)) \
         SvUTF8_on(sv);
 #else
