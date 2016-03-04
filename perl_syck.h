@@ -646,7 +646,7 @@ yaml_syck_parser_handler
 
 #ifdef YAML_IS_JSON
 static char* perl_json_preprocess(char *s) {
-    int i;
+    STRLEN i;
     char *out;
     char ch;
     char in_string = '\0';
@@ -687,7 +687,7 @@ static char* perl_json_preprocess(char *s) {
 }
 
 void perl_json_postprocess(SV *sv) {
-    int i;
+    STRLEN i;
     char ch;
     bool in_string = 0;
     bool in_quote  = 0;
@@ -830,19 +830,21 @@ yaml_syck_mark_emitter
 #endif
 (SyckEmitter *e, SV *sv) {
 #ifdef YAML_IS_JSON
-    e->depth++;
+    struct emitter_xtra* bonus = (struct emitter_xtra*)e->bonus;
+    bonus->depth++;
 #endif
 
     if (syck_emitter_mark_node(e, (st_data_t)sv) == 0) {
 #ifdef YAML_IS_JSON
-        e->depth--;
+        bonus->depth--;
 #endif
         return;
     }
 
 #ifdef YAML_IS_JSON
-    if (e->depth >= e->max_depth) {
-        croak("Dumping circular structures is not supported with JSON::Syck, consider increasing $JSON::Syck::MaxDepth higher then %d.", e->max_depth);
+    if (bonus->depth >= bonus->max_depth) {
+        croak("Dumping circular structures is not supported with JSON::Syck,"
+              " consider increasing $JSON::Syck::MaxDepth higher then %d.", bonus->max_depth);
     }
 #endif
 
@@ -850,7 +852,7 @@ yaml_syck_mark_emitter
         PERL_SYCK_MARK_EMITTER(e, SvRV(sv));
 #ifdef YAML_IS_JSON
         st_insert(e->markers, (st_data_t)sv, 0);
-        e->depth--;
+        bonus->depth--;
 #endif
         return;
     }
@@ -892,7 +894,7 @@ yaml_syck_mark_emitter
 
 #ifdef YAML_IS_JSON
     st_insert(e->markers, (st_data_t)sv, 0);
-    --e->depth;
+    --bonus->depth;
 #endif
 }
 
@@ -904,14 +906,14 @@ json_syck_emitter_handler
 yaml_syck_emitter_handler
 #endif
 (SyckEmitter *e, st_data_t data) {
-    I32  len, i;
+    STRLEN  len, i;
     SV*  sv                    = (SV*)data;
     struct emitter_xtra *bonus = (struct emitter_xtra *)e->bonus;
     char* tag                  = bonus->tag;
     svtype ty                  = SvTYPE(sv);
 #ifndef YAML_IS_JSON
-    char dump_code             = bonus->dump_code;
-    char implicit_binary       = bonus->implicit_binary;
+    bool dump_code             = bonus->dump_code;
+    bool implicit_binary       = bonus->implicit_binary;
     char* ref                  = NULL;
 #endif
 
@@ -984,6 +986,10 @@ yaml_syck_emitter_handler
 #endif
             }
         }
+        if (strlen(ref) >= MAX_TAG_LENGTH) {
+            croak("Illegal tag name %s", ref);
+            return;
+        }
         strcat(tag, ref);
     }
 #endif
@@ -1005,7 +1011,7 @@ yaml_syck_emitter_handler
             }
 #if PERL_VERSION > 10
             case SVt_REGEXP: {
-                STRLEN len = sv_len(sv);
+                len = sv_len(sv);
                 syck_emit_scalar( e, OBJOF("tag:!perl:regexp"), SCALAR_STRING, 0, 0, 0, SvPV_nolen(sv), len );
                 syck_emit_end(e);
                 break;
@@ -1021,17 +1027,15 @@ yaml_syck_emitter_handler
         }
 #endif
     }
-    else if (ty == SVt_NULL) {
-        /* emit an undef */
+    else if (ty == SVt_NULL) { /* emit an undef */
         syck_emit_scalar(e, "str", scalar_plain, 0, 0, 0, NULL_LITERAL, NULL_LITERAL_LENGTH);
     }
     else if ((ty == SVt_PVMG) && !SvOK(sv)) {
-        /* emit an undef (typically pointed from a blesed SvRV) */
+        /* emit an undef (typically pointed from a blessed SvRV) */
         syck_emit_scalar(e, OBJOF("str"), scalar_plain, 0, 0, 0, NULL_LITERAL, NULL_LITERAL_LENGTH);
     }
-    else if (SvPOK(sv)) {
-        /* emit a string */
-        STRLEN len = sv_len(sv);
+    else if (SvPOK(sv)) { /* emit a string */
+        len = sv_len(sv);
 
 /* JSON should preserve quotes even on simple integers ("0" is true in javascript) */
 #ifndef YAML_IS_JSON
@@ -1062,7 +1066,7 @@ yaml_syck_emitter_handler
             /* scan string for high-bits in the SV */
             bool is_ascii = TRUE;
             char *str = SvPV_nolen(sv);
-            STRLEN len = sv_len(sv);
+            len = sv_len(sv);
 
             for (i = 0; i < len; i++) {
                 if (*(str + i) & 0x80) {
@@ -1086,7 +1090,6 @@ yaml_syck_emitter_handler
     else if (SvNIOK(sv)) {
     	/* Stringify the sv, being careful not to overwrite its PV part */
     	SV *sv2 = newSVsv(sv);
-    	STRLEN len;
     	char *str = SvPV(sv2, len);
     	if (SvIOK(sv) /* original SV was an int */
     	    && syck_str_is_unquotable_integer(str, len)) /* small enough to safely round-trip */
@@ -1188,7 +1191,6 @@ yaml_syck_emitter_handler
                 }
                 else {
                     dSP;
-                    I32 len;
                     int count, reallen;
                     SV *text;
                     CV *cv = (CV*)sv;
@@ -1272,22 +1274,19 @@ DumpYAMLImpl
 (SV *sv, struct emitter_xtra *bonus, SyckOutputHandler output_handler) {
     SyckEmitter *emitter = syck_new_emitter();
     SV *headless         = GvSV(gv_fetchpv(form("%s::Headless", PACKAGE_NAME), TRUE, SVt_PV));
+    SV *sortkeys         = GvSV(gv_fetchpv(form("%s::SortKeys", PACKAGE_NAME), TRUE, SVt_PV));
+    SV *singlequote      = GvSV(gv_fetchpv(form("%s::SingleQuote", PACKAGE_NAME), TRUE, SVt_PV));
+#ifdef YAML_IS_JSON
+    SV *max_depth        = GvSV(gv_fetchpv(form("%s::MaxDepth", PACKAGE_NAME), TRUE, SVt_PV));
+    emitter->indent      = PERL_SYCK_INDENT_LEVEL;
+    json_quote_char      = (SvTRUE(singlequote) ? '\'' : '"' );
+    json_quote_style     = (SvTRUE(singlequote) ? scalar_1quote_esc : scalar_2quote );
+#else
     SV *implicit_binary  = GvSV(gv_fetchpv(form("%s::ImplicitBinary", PACKAGE_NAME), TRUE, SVt_PV));
     SV *use_code         = GvSV(gv_fetchpv(form("%s::UseCode", PACKAGE_NAME), TRUE, SVt_PV));
     SV *dump_code        = GvSV(gv_fetchpv(form("%s::DumpCode", PACKAGE_NAME), TRUE, SVt_PV));
-    SV *sortkeys         = GvSV(gv_fetchpv(form("%s::SortKeys", PACKAGE_NAME), TRUE, SVt_PV));
-#ifdef YAML_IS_JSON
-    SV *singlequote      = GvSV(gv_fetchpv(form("%s::SingleQuote", PACKAGE_NAME), TRUE, SVt_PV));
-    SV *max_depth        = GvSV(gv_fetchpv(form("%s::MaxDepth", PACKAGE_NAME), TRUE, SVt_PV));
-    json_quote_char      = (SvTRUE(singlequote) ? '\'' : '"' );
-    json_quote_style     = (SvTRUE(singlequote) ? scalar_1quote_esc : scalar_2quote );
-    emitter->indent      = PERL_SYCK_INDENT_LEVEL;
-    emitter->max_depth   = SvIOK(max_depth) ? SvIV(max_depth) : json_max_depth;
-#else
-    SV *singlequote      = GvSV(gv_fetchpv(form("%s::SingleQuote", PACKAGE_NAME), TRUE, SVt_PV));
     yaml_quote_style     = (SvTRUE(singlequote) ? scalar_1quote : scalar_none);
 #endif
-    emitter->no_complex_key = 1;
 
     ENTER; SAVETMPS;
 
@@ -1308,10 +1307,14 @@ DumpYAMLImpl
     emitter->sort_keys = SvTRUE(sortkeys);
     emitter->anchor_format = "%d";
 
-    New(801, bonus->tag, 512, char);
-    *(bonus->tag) = '\0';
-    bonus->dump_code = SvTRUE(use_code) || SvTRUE(dump_code);
+#ifdef YAML_IS_JSON
+    bonus->depth = 0;
+    bonus->max_depth = SvIOK(max_depth) ? SvIV(max_depth) : json_max_depth;
+#else
     bonus->implicit_binary = SvTRUE(implicit_binary);
+    bonus->dump_code = SvTRUE(use_code) || SvTRUE(dump_code);
+    *(bonus->tag) = '\0';
+#endif
     emitter->bonus = bonus;
 
     syck_emitter_handler( emitter, PERL_SYCK_EMITTER_HANDLER );
@@ -1327,8 +1330,6 @@ DumpYAMLImpl
     syck_emit( emitter, (st_data_t)sv );
     syck_emitter_flush( emitter, 0 );
     syck_free_emitter( emitter );
-
-    Safefree(bonus->tag);
 
     FREETMPS; LEAVE;
 

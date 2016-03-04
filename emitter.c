@@ -16,6 +16,8 @@
 
 #define DEFAULT_ANCHOR_FORMAT "id%03d"
 
+#define STR_EQC(str, cstr) (strncmp( (str), cstr, sizeof(cstr)-1 ) == 0)
+
 const unsigned char hex_table[] = 
 "0123456789ABCDEF";
 static unsigned char b64_table[] =
@@ -74,10 +76,10 @@ syck_base64dec( const char *s, long len, long *out_len )
         first = 0;
 
         for (i = 0; i < 256; i++) {
-        b64_xtable[i] = -1;
+            b64_xtable[i] = -1;
         }
         for (i = 0; i < 64; i++) {
-        b64_xtable[(int)b64_table[i]] = i;
+            b64_xtable[(int)b64_table[i]] = i;
         }
     }
     while (s < send) {
@@ -113,35 +115,16 @@ SyckEmitter *
 syck_new_emitter(void)
 {
     SyckEmitter *e;
-    e = S_ALLOC( SyckEmitter );
-    e->headless = 0;
-    e->use_header = 0;
-    e->use_version = 0;
-    e->sort_keys = 0;
-    e->anchor_format = NULL;
-    e->explicit_typing = 0;
+    e = S_CALLOC( SyckEmitter );
     e->best_width = 80;
     e->style = scalar_none;
     e->stage = doc_open;
     e->indent = 2;
     e->level = -1;
-    e->anchors = NULL;
-    e->markers = NULL;
-    e->anchored = NULL;
     e->bufsize = SYCK_BUFFERSIZE;
-    e->buffer = NULL;
-    e->marker = NULL;
-    e->bufpos = 0;
-    e->emitter_handler = NULL;
-    e->output_handler = NULL;
-    e->lvl_idx = 0;
     e->lvl_capa = ALLOC_CT;
-    e->levels = S_ALLOC_N( SyckLevel, e->lvl_capa ); 
+    e->levels = S_ALLOC_N( SyckLevel, e->lvl_capa );
     syck_emitter_reset_levels( e );
-    e->depth = 0;
-    e->max_depth = 512;
-    e->no_complex_key = 0;
-    e->bonus = NULL;
     return e;
 }
 
@@ -302,7 +285,7 @@ syck_emitter_write( SyckEmitter *e, const char *str, long len )
      * Flush if at end of buffer
      */
     at = e->marker - e->buffer;
-    if ( len + at >= e->bufsize - 1 )
+    if ( len + at >= (long)e->bufsize - 1 )
     {
         syck_emitter_flush( e, 0 );
         for (;;) {
@@ -335,7 +318,7 @@ syck_emitter_flush( SyckEmitter *e, long check_room )
      */
     if ( check_room > 0 )
     {
-        if ( (e->bufsize - 1) > ( e->marker - e->buffer ) + check_room )
+      if ( (long)(e->bufsize - 1) > ( e->marker - e->buffer ) + check_room )
         {
             return;
         }
@@ -459,7 +442,9 @@ void syck_emit_tag( SyckEmitter *e, const char *tag, const char *ignore )
 {
     SyckLevel *lvl;
     if ( tag == NULL ) return;
-    if ( ignore != NULL && syck_tagcmp( tag, ignore ) == 0 && e->explicit_typing == 0 ) return;
+    if ( ignore != NULL
+      && syck_tagcmp( tag, ignore ) == 0
+      && e->explicit_typing == 0 ) return;
     lvl = syck_emitter_current_level( e );
 
     /* implicit */
@@ -467,7 +452,7 @@ void syck_emit_tag( SyckEmitter *e, const char *tag, const char *ignore )
         syck_emitter_write( e, "! ", 2 );
 
     /* global types */
-    } else if ( strncmp( tag, "tag:", 4 ) == 0 ) {
+    } else if ( STR_EQC(tag, "tag:") ) {
         int taglen = strlen( tag );
         syck_emitter_write( e, "!", 1 );
         if ( strncmp( tag + 4, YAML_DOMAIN, strlen( YAML_DOMAIN ) ) == 0 ) {
@@ -477,7 +462,7 @@ void syck_emit_tag( SyckEmitter *e, const char *tag, const char *ignore )
             const char *subd = tag + 4;
             while ( *subd != ':' && *subd != '\0' ) subd++;
             if ( *subd == ':' ) {
-                if ( subd - tag > ( strlen( YAML_DOMAIN ) + 5 ) &&
+              if ( (unsigned long)(subd - tag) > ( strlen( YAML_DOMAIN ) + 5 ) &&
                      strncmp( subd - strlen( YAML_DOMAIN ), YAML_DOMAIN, strlen( YAML_DOMAIN ) ) == 0 ) {
                     syck_emitter_write( e, tag + 4, subd - strlen( YAML_DOMAIN ) - ( tag + 4 ) - 1 );
                     syck_emitter_write( e, "/", 1 );
@@ -495,7 +480,7 @@ void syck_emit_tag( SyckEmitter *e, const char *tag, const char *ignore )
         syck_emitter_write( e, " ", 1 );
 
     /* private types */
-    } else if ( strncmp( tag, "x-private:", 10 ) == 0 ) {
+    } else if ( STR_EQC( tag, "x-private:" ) ) {
         syck_emitter_write( e, "!!", 2 );
         syck_emitter_write( e, tag + 10, strlen( tag ) - 10 );
         syck_emitter_write( e, " ", 1 );
@@ -575,8 +560,8 @@ syck_scan_scalar( int req_width, const char *cursor, long len )
             flags |= SCAN_INDIC_S;
     }
     if ( ( cursor[0] == '-' || cursor[0] == ':' ||
-           cursor[0] == '?' || cursor[0] == ',' ) &&
-           ( cursor[1] == ' ' || cursor[1] == '\n' || cursor[1] == '\r' || len == 1 ) )
+           cursor[0] == '?' || cursor[0] == ',' )
+        && ( cursor[1] == ' ' || cursor[1] == '\n' || cursor[1] == '\r' || len == 1 ) )
     {
             flags |= SCAN_INDIC_S;
     }
@@ -595,7 +580,7 @@ syck_scan_scalar( int req_width, const char *cursor, long len )
     }
 
     /* opening doc sep */
-    if ( len >= 3 && strncmp( cursor, "---", 3 ) == 0 )
+    if ( len >= 3 && STR_EQC( cursor, "---" ) )
         flags |= SCAN_DOCSEP;
 
     /* scan string */
@@ -612,7 +597,7 @@ syck_scan_scalar( int req_width, const char *cursor, long len )
         }
         else if ( cursor[i] == '\n' ) {
             flags |= SCAN_NEWLINE;
-            if ( len - i >= 3 && strncmp( &cursor[i+1], "---", 3 ) == 0 )
+            if ( len - i >= 3 && STR_EQC( &cursor[i+1], "---" ) )
                 flags |= SCAN_DOCSEP;
             if ( cursor[i+1] == ' ' || cursor[i+1] == '\t' ) 
                 flags |= SCAN_INDENTED;
@@ -669,8 +654,11 @@ void syck_emit_scalar( SyckEmitter *e, const char *tag, enum scalar_style force_
     if ( str == NULL ) str = "";
 
     /* No empty nulls as map keys */
-    if ( len == 0 && ( parent->status == syck_lvl_map || parent->status == syck_lvl_imap ) && 
-         parent->ncount % 2 == 1 && syck_tagcmp( tag, "tag:yaml.org,2002:null" ) == 0 ) 
+    if ( len == 0
+      && ( parent->status == syck_lvl_map
+        || parent->status == syck_lvl_imap )
+      && parent->ncount % 2 == 1
+      && syck_tagcmp( tag, "tag:yaml.org,2002:null" ) == 0 ) 
     {
         str = "~";
         len = 1;
@@ -681,31 +669,32 @@ void syck_emit_scalar( SyckEmitter *e, const char *tag, enum scalar_style force_
 
     /* quote strings which default to implicits */
 #ifdef PERL_VERSION
-    if (
-            (
-                (strncmp( implicit, "bool", 4 ) == 0) || 
-                (strncmp( implicit, "null", 4 ) == 0)
-            )
-            &&
-            (force_style != scalar_plain)
-            &&
-            (len > 0)
-            ) {
+    if ( (STR_EQC( implicit, "bool" ) || 
+          STR_EQC( implicit, "null" ))
+         && force_style != scalar_plain
+         && len > 0 )  {
         force_style = (force_style == scalar_2quote) ? scalar_2quote : scalar_1quote;
 #else
     implicit = syck_taguri( YAML_DOMAIN, implicit, strlen( implicit ) );
-    if ( syck_tagcmp( tag, implicit ) != 0 && syck_tagcmp( tag, "tag:yaml.org,2002:str" ) == 0 ) {
+    if ( syck_tagcmp( tag, implicit ) != 0
+      && syck_tagcmp( tag, "tag:yaml.org,2002:str" ) == 0 ) {
         force_style = scalar_2quote;
 #endif
-    } else {
-        if ( !e->no_complex_key &&
-             parent->status == syck_lvl_map && parent->ncount % 2 == 1 &&
-             ( !( tag == NULL || 
-             ( implicit != NULL && syck_tagcmp( tag, implicit ) == 0 && e->explicit_typing == 0 ) ) ) ) 
+    }
+    else {
+#ifndef PERL_VERSION
+        /* complex key */
+        if (parent->status == syck_lvl_map
+          && parent->ncount % 2 == 1
+          && ( !( tag == NULL
+                  || ( implicit != NULL
+                    && syck_tagcmp( tag, implicit ) == 0
+                    && e->explicit_typing == 0 ) ) ) ) 
         {
             syck_emitter_write( e, "? ", 2 );
             parent->status = syck_lvl_mapx;
         }
+#endif
         syck_emit_tag( e, tag, implicit );
     }
 
@@ -725,19 +714,26 @@ void syck_emit_scalar( SyckEmitter *e, const char *tag, enum scalar_style force_
     /* Determine block style */
     if ( scan & SCAN_NONPRINT ) {
         force_style = scalar_2quote;
-    } else if ( force_style != scalar_1quote && force_style != scalar_1quote_esc && ( scan & SCAN_WHITEEDGE ) ) {
+    } else if ( force_style != scalar_1quote
+                && force_style != scalar_1quote_esc
+                && ( scan & SCAN_WHITEEDGE ) ) {
         force_style = scalar_2quote;
     } else if ( force_style != scalar_fold && ( scan & SCAN_INDENTED ) ) {
         force_style = scalar_literal;
     } else if ( force_style == scalar_plain && ( scan & SCAN_NEWLINE ) ) {
         force_style = favor_style;
-    } else if ( force_style == scalar_plain && parent->status == syck_lvl_iseq && ( scan & SCAN_FLOWSEQ ) ) {
+    } else if ( force_style == scalar_plain
+                && parent->status == syck_lvl_iseq
+                && ( scan & SCAN_FLOWSEQ ) ) {
         force_style = scalar_2quote;
-    } else if ( force_style == scalar_plain && parent->status == syck_lvl_imap && ( scan & SCAN_FLOWMAP ) ) {
+    } else if ( force_style == scalar_plain
+                && parent->status == syck_lvl_imap
+                && ( scan & SCAN_FLOWMAP ) ) {
         force_style = scalar_2quote;
     /* } else if ( force_style == scalar_fold && ( ! ( scan & SCAN_WIDE ) ) ) {
         force_style = scalar_literal; */
-    } else if ( force_style == scalar_plain && ( scan & SCAN_INDIC_S || scan & SCAN_INDIC_C ) ) {
+    } else if ( force_style == scalar_plain
+                && ( scan & SCAN_INDIC_S || scan & SCAN_INDIC_C ) ) {
         if ( scan & SCAN_NEWLINE ) {
             force_style = favor_style;
         } else {
@@ -752,15 +748,23 @@ void syck_emit_scalar( SyckEmitter *e, const char *tag, enum scalar_style force_
     }
 
     /* For now, all ambiguous keys are going to be double-quoted */
-    if ( ( parent->status == syck_lvl_map || parent->status == syck_lvl_mapx ) && parent->ncount % 2 == 1 ) {
+    if ( ( parent->status == syck_lvl_map
+           || parent->status == syck_lvl_mapx )
+         && parent->ncount % 2 == 1 )
+    {
         if ( force_style != scalar_plain ) {
             force_style = scalar_2quote;
         }
     }
 
     /* If the parent is an inline, double quote anything complex */
-    if ( parent->status == syck_lvl_imap || parent->status == syck_lvl_iseq ) {
-        if ( force_style != scalar_plain && force_style != scalar_1quote && force_style != scalar_1quote_esc) {
+    if ( parent->status == syck_lvl_imap
+      || parent->status == syck_lvl_iseq )
+    {
+        if ( force_style != scalar_plain
+          && force_style != scalar_1quote
+          && force_style != scalar_1quote_esc)
+        {
             force_style = scalar_2quote;
         }
     }
@@ -776,9 +780,10 @@ void syck_emit_scalar( SyckEmitter *e, const char *tag, enum scalar_style force_
      * Ruby will treat it as the symbol :bar. For compatability with Ruby emit
      * these with quotes.
      */
-    if ( force_style == scalar_plain &&
-         strncmp( implicit, "str", 4 ) == 0 &&
-         str[0] == ':' ) {
+    if ( force_style == scalar_plain
+      && STR_EQC( implicit, "str" )
+      && str[0] == ':' )
+    {
         force_style = scalar_literal;
     }
 
@@ -818,15 +823,13 @@ void syck_emit_scalar( SyckEmitter *e, const char *tag, enum scalar_style force_
 }
 
 void
-syck_emitter_escape( SyckEmitter *e, const unsigned char *src, long len )
+syck_emitter_escape( SyckEmitter *e, const char *str, long len )
 {
     int i;
+    const unsigned char *src = (const unsigned char *)str;
     for( i = 0; i < len; i++ )
     {
-        /* XXX - scalar_fold overloaded to mean utf8 from Audrey Tang */
-        if( (e->style == scalar_fold)
-                ? ((src[i] < 0x20) && (0 < src[i]))
-                : ((src[i] < 0x20) || (0x7E < src[i])) )
+        if( src[i] < 0x20 || src[i] > 0x7E )
         {
             syck_emitter_write( e, "\\", 1 );
             if( '\0' == src[i] )
@@ -840,7 +843,7 @@ syck_emitter_escape( SyckEmitter *e, const unsigned char *src, long len )
         }
         else
         {
-            syck_emitter_write( e, (const char*)(src + i), 1 );
+            syck_emitter_write( e, src + i, 1 );
             if( '\\' == src[i] )
                 syck_emitter_write( e, "\\", 1 );
         }
@@ -886,7 +889,7 @@ void syck_emit_1quoted( SyckEmitter *e, int width, const char *str, long len )
             break;
 
             default:
-                syck_emitter_escape( e, (unsigned char *)mark, 1 );
+                syck_emitter_escape( e, mark, 1 );
                 /*syck_emitter_write( e, mark, 1 );*/
             break;
         }
@@ -951,7 +954,7 @@ void syck_emit_2quoted( SyckEmitter *e, int width, const char *str, long len )
             break;
 
             default:
-                syck_emitter_escape( e, (unsigned char*)mark, 1 );
+                syck_emitter_escape( e, mark, 1 );
             break;
         }
         mark++;
@@ -1012,7 +1015,7 @@ void syck_emit_1quoted_esc( SyckEmitter *e, int width, const char *str, long len
             break;
 
             default:
-                syck_emitter_escape( e, (unsigned char *)mark, 1 );
+                syck_emitter_escape( e, mark, 1 );
             break;
         }
         mark++;
@@ -1150,7 +1153,10 @@ void syck_emit_map( SyckEmitter *e, const char *tag, enum map_style style )
     }
 
     syck_emit_tag( e, tag, "tag:yaml.org,2002:map" );
-    if ( style == map_inline || ( parent->status == syck_lvl_imap || parent->status == syck_lvl_iseq ) ) {
+    if ( style == map_inline
+      || parent->status == syck_lvl_imap
+      || parent->status == syck_lvl_iseq )
+    {
         syck_emitter_write( e, "{", 1 );
         lvl->status = syck_lvl_imap;
     } else {
@@ -1176,13 +1182,18 @@ void syck_emit_item( SyckEmitter *e, st_data_t n )
                 /* shortcut -- the lvl->anctag check should be unneccesary but
                  * there is a nasty shift/reduce in the parser on this point and
                  * i'm not ready to tickle it. */
-                if ( parent->ncount % 2 == 0 && lvl->anctag == 0 ) {
+                if ( parent->ncount % 2 == 0
+                  && lvl->anctag == 0 )
+                {
                     lvl->spaces = parent->spaces;
                 }
             }
 
             /* seq-in-seq shortcut */
-            else if ( lvl->anctag == 0 && parent->status == syck_lvl_seq && lvl->ncount == 0 ) {
+            else if ( lvl->anctag == 0
+                   && parent->status == syck_lvl_seq
+                   && lvl->ncount == 0 )
+            {
                 int spcs = ( lvl->spaces - parent->spaces ) - 2;
                 if ( spcs >= 0 ) {
                     int i = 0;
@@ -1212,7 +1223,10 @@ void syck_emit_item( SyckEmitter *e, st_data_t n )
             SyckLevel *parent = syck_emitter_parent_level( e );
 
             /* map-in-seq shortcut */
-            if ( lvl->anctag == 0 && parent->status == syck_lvl_seq && lvl->ncount == 0 ) {
+            if ( lvl->anctag == 0
+              && parent->status == syck_lvl_seq
+              && lvl->ncount == 0 )
+            {
                 int spcs = ( lvl->spaces - parent->spaces ) - 2;
                 if ( spcs >= 0 ) {
                     int i = 0;
@@ -1356,8 +1370,8 @@ syck_emitter_mark_node( SyckEmitter *e, st_data_t n )
         if ( ! st_lookup( e->anchors, (st_data_t)oid, (st_data_t *)&anchor_name ) )
         {
             int idx = 0;
-            const char *anc = ( e->anchor_format == NULL ? DEFAULT_ANCHOR_FORMAT : e->anchor_format );
-
+            const char *anc = ( !e->anchor_format ? DEFAULT_ANCHOR_FORMAT
+                                                  : e->anchor_format );
             /*
              * Second time hitting this object, let's give it an anchor
              */

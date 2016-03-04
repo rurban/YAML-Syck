@@ -31,27 +31,33 @@
 #include "Storable.xs"
 */
 
+#define MAX_TAG_LENGTH  512
+
 struct emitter_xtra {
     union {
       SV* outsv;
       PerlIO* outio;
     } out;
-    char* tag;
-    char dump_code;
-    bool implicit_binary;
     int ioerror;
+    /* Protect from JSON recursion with cyclic data: default 512 */
+    int max_depth;
+    int depth;
+    /* YAML: */
+    char tag[MAX_TAG_LENGTH];
+    bool implicit_binary;
+    bool dump_code;
 };
 
 struct parser_xtra {
     AV *objects;
+    HV *bad_anchors;
     bool implicit_unicode;
     bool load_code;
     bool load_blessed;
-    HV *bad_anchors;
 };
 
 SV* perl_syck_lookup_sym( SyckParser *p, SYMID v) {
-    /* Not "undef" becase otherwise we have a warning on self-recursive nodes */
+    /* Not "undef" because otherwise we have a warning on self-recursive nodes */
     SV *obj = &PL_sv_no;
     syck_lookup_sym(p, v, (char **)&obj);
     return obj;
@@ -77,8 +83,7 @@ SyckNode * perl_syck_bad_anchor_handler(SyckParser *p, char *a) {
 }
 
 void perl_syck_error_handler(SyckParser *p, char *msg) {
-    croak("%s parser (line %d, column %ld): %s",
-        "Syck",
+    croak("Syck parser (line %d, column %ld): %s",
         p->linect + 1,
         (long) (p->cursor - p->lineptr),
         msg );

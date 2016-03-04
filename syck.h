@@ -64,6 +64,7 @@ extern "C" {
 #define SYCK_BUFFERSIZE 4096
 #define S_ALLOC_N(type,n) (type*)malloc(sizeof(type)*(n))
 #define S_ALLOC(type) (type*)malloc(sizeof(type))
+#define S_CALLOC(type) (type*)calloc(1,sizeof(type))
 #define S_REALLOC_N(var,type,n) (var)=(type*)realloc((char*)(var),sizeof(type)*(n))
 #define S_FREE(n) free(n); n = NULL;
 
@@ -338,11 +339,6 @@ struct _syck_emitter {
     SyckLevel *levels;
     int lvl_idx;
     int lvl_capa;
-    /* Protect from recursion with cyclic data */
-    int max_depth;
-    int depth;
-    int permit_duplicate;  /* Added with 0.71, from perl */
-    int no_complex_key;    /*        -"- */
     /* Pointer for extension's use */
     void *bonus;
 };
@@ -394,7 +390,7 @@ void syck_emitter_handler( SyckEmitter *, SyckEmitterHandler );
 void syck_free_emitter( SyckEmitter * );
 void syck_emitter_clear( SyckEmitter * );
 void syck_emitter_write( SyckEmitter *, const char *, long );
-void syck_emitter_escape( SyckEmitter *, const unsigned char *, long );
+void syck_emitter_escape( SyckEmitter *, const char *, long );
 void syck_emitter_flush( SyckEmitter *, long );
 void syck_emit( SyckEmitter *, st_data_t );
 void syck_emit_scalar( SyckEmitter *, const char *, enum scalar_style, int, int, char, const char *, long );

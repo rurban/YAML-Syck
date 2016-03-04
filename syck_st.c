@@ -110,11 +110,11 @@ static long primes[] = {
 	0
 };
 
-static int
+static long
 new_size(size)
     int size;
 {
-    int i;
+    unsigned short i;
 
 #if 0
     for (i=3; i<31; i++) {
@@ -162,7 +162,7 @@ st_init_table_with_size(type, size)
     }
 #endif
 
-    size = new_size(size);	/* round up to prime number */
+    size = (int)new_size(size);	/* round up to prime number */
 
     tbl = alloc(st_table);
     tbl->type = type;
