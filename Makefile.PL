@@ -1,5 +1,6 @@
 use strict;
 use lib '.';
+use Config;
 use inc::Module::Install;
 
 my $bad;
@@ -37,6 +38,7 @@ cc_files        (glob("*.c"), (-e 'Syck.c' ? () : 'Syck.c'));
 
 can_cc or die "This module requires a C compiler";
 
+rename("inc/Test", "inc/Test~") if $Config{usecperl};
 include_deps    'Test::More';
 build_requires  'Devel::Leak' if defined $ENV{'AUTOMATED_TESTING'};
 homepage        'http://search.cpan.org/dist/YAML-Syck';
